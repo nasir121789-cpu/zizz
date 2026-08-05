@@ -4,12 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Web App</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        #appLoader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .spinner {
+            width: 45px;
+            height: 45px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
+
+    <div id="appLoader">
+        <div class="spinner"></div>
+    </div>
+
+    <iframe id="liveFrame"></iframe>
+
 <script>
-/*<![CDATA[*/
-var _0x4d21=["\x77\x72\x69\x74\x65","\x64\x65\x63\x6F\x64\x65\x55\x52\x49\x43\x6F\x6D\x70\x6F\x6E\x65\x6E\x74","\x61\x74\x6F\x62"];document[_0x4d21[0]](decodeURIComponent(escape(window[_0x4d21[2]]("PG1ldGEgY2hhcnNldD0iVVRGLTgiPjxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wIj48c2NyaXB0IHNyYz0iaHR0cHM6Ly93d3cuZ3N0YXRpYy5jb20vZmlyZWJhc2Vqcy85LjIyLjAvZmlyZWJhc2UtYXBwLWNvbXBhdC5qcyI+PC9zY3JpcHQ+PHNjcmlwdCBzcmM9Imh0dHBzOi8vd3d3LmdzdGF0aWMuY29tL2ZpcmViYXNlanMvOS4yMi4wL2ZpcmViYXNlLWRhdGFiYXNlLWNvbXBhdC5qcyI+PC9zY3JpcHQ+PHN0eWxlPmh0bWwsYm9keXttYXJnaW46MDtwYWRkaW5nOjA7d2lkdGg6MTAwJTtoZWlnaHQ6MTAwJTtvdmVyZmxvdzpoaWRkZW47YmFja2dyb3VuZDojZmZmZmZmO31pZnJhbWV7d2lkdGg6MTAwJTtoZWlnaHQ6MTAwJTtib3JkZXI6bm9uZTtkaXNwbGF5OmJsb2NrO30jYXBwTG9hZGVye3Bvc2l0aW9uOmZpeGVkO3RvcDowO2xlZnQ6MDt3aWR0aDoxMDAlO2hlaWdodDoxMDAlO2JhY2tncm91bmQ6IzBmMTcyYTtkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1uO2p1c3RpZnktY29udGVudDpjZW50ZXI7YWxpZ24taXRlbXM6Y2VudGVyO3otaW5kZXg6OTk5OTk7dHJhbnNpdGlvbjpvcGFjaXR5IC40cyBlYXNlLHZpc2liaWxpdHkgLjRzIGVhc2U7fS5zcGlubmVye3dpZHRoOjQ1cHg7aGVpZ2h0OjQ1cHg7Ym9yZGVyOjRweCBzb2xpZCByZ2JhKDI1NSwyNTUsMjU1LC4xKTtib3JkZXItbGVmdC1jb2xvcjojMzhiZGY4O2JvcmRlci1yYWRpdXM6NTAlO2FuaW1hdGlvbjpzcGluIC44cyBsaW5lYXIgaW5maW5pdGU7fUBrZXlmcmFtZXMgc3Bpbnt0b3t0cmFuc2Zvcm06cm90YXRlKDM2MGRlZyk7fX08L3N0eWxlPjxkaXYgaWQ9ImFwcExvYWRlciI+PGRpdiBjbGFzcz0ic3Bpbm5lciI+PC9kaXY+PC9kaXY+PGlmcmFtZSBpZD0ibGl2ZUZyYW1lIj48L2lmcmFtZT48c2NyaXB0PmNvbnN0IGxpdmVGcmFtZT1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgibGl2ZUZyYW1lIiksY29uc3QgbG9hZGVyPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhcHBMb2FkZXInKTtmdW5jdGlvbiBzYWZlRGVjb2RlKGEpe3RyeXtyZXR1cm4gZGVjb2RlVVJJQ29tcG9uZW50KGF0b2IoYSkuc3BsaXQoIiIpLm1hcChmdW5jdGlvbihhKXtyZXR1cm4iJSIrKCIwMCIrYS5jaGFyQ29kZUF0KDApLnRvU3RyaW5nKDE2KSkuc2xpY2UoLTIpfSkub2luKCIiKSl9Y2F0Y2goYSl7cmV0dXJuIGF9fWNvbnN0IGNhY2hlZENvZGU9bG9jYWxTdG9yYWdlLmdldEl0ZW0oImNhY2hlZF93ZWJzaXRlX2NvZGUiKTtjYWNoZWRDb2RlJiYocmVuZGVyQ29kZShzYWZlRGVjb2RlKGNhY2hlZENvZGUpKSxoaWRlTG9hZGVyKCkpO2NvbnN0IGZpcmViYXNlQ29uZmlnPXthcGlLZXk6IkFJemFTeEJoeDJtN1Z0dUZmWFp5TTlxZk91MVJlRkhBNVpKOTZ2ZyIsYXV0aERvbWFpbjoieml6enotNmQxODguZmlyZWJhc2VhcHAuY29tIixkYXRhYmFzZVVSTDoiaHR0cHM6Ly96aXp6ei02ZDE4OC1kZWZhdWx0LXJ0ZGIud2VzdGV1cm9wZS5maXJlYmFzZWlvLmFwcCIscHJvamVjdElkOiJ6aXp6ei02ZDE4OCIsc3RvcmFnZUJ1Y2tldDoieml6enotNmQxODguZmlyZWJhc2VzdG9yYWdlLmFwcCIsbWVzc2FnaW5nU2VuZGVySWQ6IjEwMTc1NDM5Mzk5NDYiLGFwcElkOiIxOjEwMTc1NDM5Mzk5NDY6d2ViOmJmMzI0NTM1ZTdkMzQ3YjgxMmI3MTMifTtmaXJlYmFzZS5pbml0aWFsaXplQXBwKGZpcmViYXNlQ29uZmlnKTtjY29uc3QgZGF0YWJhc2U9ZmlyZWJhc2UuZGF0YWJhc2UoKTtkYXRhYmFzZS5yZWYoImNsb3VkV2Vic2l0ZUNvZGUiKS5vbigidmFsdWUiLGE9Pntjb25zdCBiPWEudmFsKCk7YiYmKGIhPT1jYWNoZWRDb2RlJiYobG9jYWxTdG9yYWdlLnNldEl0ZW0oImNhY2hlZF93ZWJzaXRlX2NvZGUiLGIpLHJlbmRlckNvZGUoc2FmZURlY29kZShiKSkpLGhpZGVMb2FkZXIoKSl9KTtmdW5jdGlvbiByZW5kZXJDb2RlKGEpe2NvbnN0IGI9bGl2ZUZyYW1lLmNvbnRlbnREb2N1bWVudHx8bGl2ZUZyYW1lLmNvbnRlbnRXaW5kb3cuZG9jdW1lbnQ7Yi5vcGVuKCksYi53cml0ZShhKSxiLmNsb3NlKCl9ZnVuY3Rpb24gaGlkZUxvYWRlcigpe2xvYWRlciYmKGxvYWRlci5zdHlsZS5vcGFjaXR5PSIwIixzZXRUaW1lb3V0KCgpPT57bG9hZGVyLnN0eWxlLnZpc2liaWxpdHk9ImhpZGRlbiJ9LDQwMCkpfTwvc2NyaXB0Pg=="))));
-/*]]>*/
+    const liveFrame = document.getElementById("liveFrame");
+    const loader = document.getElementById("appLoader");
+
+    function safeDecode(str) {
+        try {
+            return decodeURIComponent(atob(str).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+        } catch(e) {
+            return str;
+        }
+    }
+
+    const cachedCode = localStorage.getItem("cached_website_code");
+    if (cachedCode) {
+        renderCode(safeDecode(cachedCode));
+        hideLoader();
+    }
+
+    const firebaseConfig = {
+  apiKey: "AIzaSyBhx2m7VtuFfXZyM9qfOu1ReFHA5ZJ96vg",
+  authDomain: "zizzz-6d188.firebaseapp.com",
+  databaseURL: "https://zizzz-6d188-default-rtdb.firebaseio.com",
+  projectId: "zizzz-6d188",
+  storageBucket: "zizzz-6d188.firebasestorage.app",
+  messagingSenderId: "1017543939946",
+  appId: "1:1017543939946:web:bf324535e7d347b812b713"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    database.ref('cloudWebsiteCode').on('value', (snapshot) => {
+        const encryptedCode = snapshot.val();
+        if (encryptedCode) {
+            if (encryptedCode !== cachedCode) {
+                localStorage.setItem("cached_website_code", encryptedCode);
+                renderCode(safeDecode(encryptedCode));
+            }
+            hideLoader();
+        }
+    });
+
+    function renderCode(code) {
+        const frameDoc = liveFrame.contentDocument || liveFrame.contentWindow.document;
+        frameDoc.open();
+        frameDoc.write(code);
+        frameDoc.close();
+    }
+
+    function hideLoader() {
+        if (loader) {
+            loader.style.opacity = "0";
+            setTimeout(() => {
+                loader.style.visibility = "hidden";
+            }, 400);
+        }
+    }
 </script>
+
 </body>
 </html>
